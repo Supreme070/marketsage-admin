@@ -1,0 +1,149 @@
+import type { NextAuthOptions, DefaultSession } from 'next-auth';
+import CredentialsProvider from 'next-auth/providers/credentials';
+
+// Extend NextAuth types for our custom fields
+declare module 'next-auth' {
+  interface User {
+    id: string;
+    role: string;
+    organizationId: string;
+    organizationName: string;
+  }
+  
+  interface Session {
+    user: {
+      id: string;
+      role: string;
+      organizationId: string;
+      organizationName: string;
+    } & DefaultSession['user'];
+    accessToken?: string;
+  }
+}
+
+declare module 'next-auth/jwt' {
+  interface JWT {
+    id: string;
+    role: string;
+    organizationId: string;
+    organizationName: string;
+    accessToken?: string;
+  }
+}
+
+// Production-ready authentication configuration with tenant support
+export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
+  session: {
+    strategy: 'jwt',
+  },
+  debug: process.env.NODE_ENV === 'development',
+  providers: [
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' },
+      },
+      async authorize(credentials, req) {
+        // Validate credentials are provided
+        if (!credentials?.email || !credentials?.password) {
+          console.warn('Authentication failed: Missing credentials');
+          return null;
+        }
+
+        try {
+          // Call backend directly for authentication
+          const backendUrl = process.env.NESTJS_BACKEND_URL || 'http://localhost:3006';
+          console.log('🔐 NextAuth: Attempting authentication with backend:', `${backendUrl}/api/v2/auth/login`);
+          console.log('🔐 NextAuth: Credentials:', { email: credentials.email, passwordLength: credentials.password?.length });
+          
+          const response = await fetch(`${backendUrl}/api/v2/auth/login`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+          });
+          
+          console.log('🔐 NextAuth: Backend response status:', response.status);
+
+          if (!response.ok) {
+            console.warn('Authentication failed: Invalid credentials', { email: credentials.email });
+            return null;
+          }
+
+          const result = await response.json();
+          console.log('🔐 NextAuth: Backend response data:', JSON.stringify(result, null, 2));
+          
+          if (!result.success || !result.data?.user) {
+            console.warn('🔐 NextAuth: Authentication failed: Invalid response from backend', { email: credentials.email, result });
+            return null;
+          }
+
+          const user = result.data.user;
+          const accessToken = result.data.token || result.token;
+
+          // Return user with tenant context and access token
+          const userData = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            organizationId: user.organizationId || null,
+            organizationName: user.organizationName || null,
+            accessToken: accessToken,
+          };
+          
+          console.log('Authorize callback - returning user:', userData);
+          return userData;
+
+        } catch (error) {
+          console.error('Authentication error:', error);
+          
+          // SECURITY: No fallbacks allowed in any environment
+          // All authentication must go through proper database validation
+          
+          return null;
+        }
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      console.log('🔐 JWT callback - user:', user);
+      console.log('🔐 JWT callback - token:', token);
+      
+      if (user) {
+        token.id = user.id;
+        token.role = user.role;
+        token.organizationId = user.organizationId || null;
+        token.organizationName = user.organizationName || null;
+        token.accessToken = (user as any).accessToken;
+        console.log('🔐 JWT callback - updated token:', token);
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      console.log('🔐 Session callback - token:', token);
+      console.log('🔐 Session callback - session:', session);
+      
+      if (token && session.user) {
+        session.user.id = token.id as string;
+        session.user.role = token.role as string;
+        session.user.organizationId = token.organizationId as string;
+        session.user.organizationName = token.organizationName as string;
+        session.accessToken = token.accessToken as string;
+        console.log('🔐 Session callback - updated session:', session);
+      }
+      return session;
+    },
+  },
+  pages: {
+    signIn: '/login',
+    error: '/login',
+  },
+}; 

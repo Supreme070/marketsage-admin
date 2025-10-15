@@ -1,0 +1,12 @@
+import type { NextRequest } from "next/server";
+import { proxyToNestJS } from "@/lib/nestjs-proxy";
+
+// Proxy analytics/performance to NestJS backend
+
+export async function GET(request: NextRequest) {
+  return proxyToNestJS(request, {
+    backendPath: "api/v2/analytics/performance",
+    requireAuth: true,
+    enableLogging: process.env.NODE_ENV === "development",
+  });
+}
