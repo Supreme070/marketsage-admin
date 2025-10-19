@@ -132,7 +132,7 @@ export function SubscriptionAuditDashboard() {
     switch (tier) {
       case "ENTERPRISE": return "bg-purple-500";
       case "PROFESSIONAL": return "bg-blue-500";
-      case "STARTER": return "bg-green-500";
+      case "BASIC": return "bg-green-500";
       default: return "bg-gray-500";
     }
   };

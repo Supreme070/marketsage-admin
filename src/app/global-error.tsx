@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Global Error Boundary
@@ -22,11 +23,21 @@ export default function GlobalError({
     // Log critical error
     console.error('Global error boundary caught:', error);
 
-    // In production, send to error reporting service
-    if (process.env.NODE_ENV === 'production') {
-      // TODO: Send to error reporting service with high priority
-      // Example: Sentry.captureException(error, { level: 'fatal' });
-    }
+    // Send to Sentry error reporting service with FATAL level
+    Sentry.captureException(error, {
+      level: 'fatal',
+      tags: {
+        errorBoundary: 'global-error',
+        component: 'global-error.tsx',
+        critical: 'true',
+      },
+      extra: {
+        digest: error.digest,
+        message: error.message,
+        stack: error.stack,
+        context: 'Root layout error - critical application failure',
+      },
+    });
   }, [error]);
 
   return (

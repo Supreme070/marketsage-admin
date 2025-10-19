@@ -269,8 +269,8 @@ export default function AdminSupportPage() {
         return <span className="admin-badge admin-badge-secondary">ENTERPRISE</span>;
       case 'pro':
         return <span className="admin-badge admin-badge-accent">PRO</span>;
-      case 'starter':
-        return <span className="admin-badge admin-badge-success">STARTER</span>;
+      case 'basic':
+        return <span className="admin-badge admin-badge-success">BASIC</span>;
       case 'free':
         return <span className="admin-badge admin-badge-secondary">FREE</span>;
       default:

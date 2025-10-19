@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home, Settings } from 'lucide-react';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * Admin Portal Error Boundary
@@ -20,11 +21,19 @@ export default function AdminError({
     // Log admin portal error
     console.error('Admin portal error:', error);
 
-    // In production, send to error reporting service with admin context
-    if (process.env.NODE_ENV === 'production') {
-      // TODO: Send to error reporting service
-      // Example: Sentry.captureException(error, { tags: { area: 'admin-portal' } });
-    }
+    // Send to Sentry error reporting service with admin context
+    Sentry.captureException(error, {
+      tags: {
+        errorBoundary: 'admin-error',
+        component: 'admin/error.tsx',
+        area: 'admin-portal',
+      },
+      extra: {
+        digest: error.digest,
+        message: error.message,
+        stack: error.stack,
+      },
+    });
   }, [error]);
 
   return (

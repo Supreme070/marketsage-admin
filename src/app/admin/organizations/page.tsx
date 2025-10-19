@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { 
-  Building2, 
-  Search, 
+import {
+  Building2,
+  Search,
   Filter,
   MoreHorizontal,
   TrendingUp,
@@ -23,9 +23,13 @@ import {
   Ban,
   CheckCircle,
   Calendar,
-  Activity
+  Activity,
+  Shield,
+  Key,
+  LogIn
 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface Organization {
   id: string;
@@ -50,6 +54,7 @@ interface Organization {
 }
 
 export default function AdminOrganizationsPage() {
+  const router = useRouter();
   const { permissions, staffRole } = useAdmin();
   const [searchTerm, setSearchTerm] = useState("");
   const [tierFilter, setTierFilter] = useState("all");
@@ -112,7 +117,7 @@ export default function AdminOrganizationsPage() {
         return <Badge variant="secondary" className="bg-blue-100 text-blue-700">Trial</Badge>;
       case 'ENTERPRISE':
       case 'PROFESSIONAL':
-      case 'STARTER':
+      case 'BASIC':
         return <Badge variant="default" className="bg-green-100 text-green-700">Active</Badge>;
       default:
         return <Badge variant="outline">{plan}</Badge>;
@@ -125,8 +130,8 @@ export default function AdminOrganizationsPage() {
         return <Badge variant="default" className="bg-purple-100 text-purple-700">Enterprise</Badge>;
       case 'PROFESSIONAL':
         return <Badge variant="default" className="bg-blue-100 text-blue-700">Professional</Badge>;
-      case 'STARTER':
-        return <Badge variant="outline">Starter</Badge>;
+      case 'BASIC':
+        return <Badge variant="outline">Basic</Badge>;
       default:
         return <Badge variant="outline">{tier}</Badge>;
     }
@@ -270,7 +275,7 @@ export default function AdminOrganizationsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Tiers</SelectItem>
-                  <SelectItem value="STARTER">Starter</SelectItem>
+                  <SelectItem value="BASIC">Basic</SelectItem>
                   <SelectItem value="PROFESSIONAL">Professional</SelectItem>
                   <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
                 </SelectContent>
@@ -384,6 +389,97 @@ export default function AdminOrganizationsPage() {
                           Plan: {org.plan}
                         </div>
                       </div>
+
+                      {/* SCIM Management - Enterprise Only */}
+                      {org.plan === 'ENTERPRISE' && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <Shield className="h-4 w-4 text-purple-600" />
+                              <span className="text-sm font-medium text-gray-900">SCIM Provisioning</span>
+                              <Badge variant="outline" className="bg-purple-50 text-purple-700 text-xs">
+                                Enterprise
+                              </Badge>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/organizations/${org.id}/scim/tokens`)}
+                              className="flex-1"
+                            >
+                              <Key className="h-3 w-3 mr-1" />
+                              Bearer Tokens
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/organizations/${org.id}/scim/users`)}
+                              className="flex-1"
+                            >
+                              <Users className="h-3 w-3 mr-1" />
+                              Provisioned Users
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/organizations/${org.id}/scim/audit-logs`)}
+                              className="flex-1"
+                            >
+                              <Shield className="h-3 w-3 mr-1" />
+                              Audit Logs
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* SSO Setup Wizards - Enterprise Only */}
+                      {org.plan === 'ENTERPRISE' && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <LogIn className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-gray-900">SSO Configuration</span>
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
+                                Enterprise
+                              </Badge>
+                            </div>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-3">
+                            Configure single sign-on with your identity provider
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/organizations/${org.id}/sso/setup/okta`)}
+                              className="flex flex-col items-center gap-1 h-auto py-3"
+                            >
+                              <Shield className="h-4 w-4 text-blue-600" />
+                              <span className="text-xs">Okta</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/organizations/${org.id}/sso/setup/azure-ad`)}
+                              className="flex flex-col items-center gap-1 h-auto py-3"
+                            >
+                              <Shield className="h-4 w-4 text-blue-600" />
+                              <span className="text-xs">Azure AD</span>
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/organizations/${org.id}/sso/setup/google-workspace`)}
+                              className="flex flex-col items-center gap-1 h-auto py-3"
+                            >
+                              <Shield className="h-4 w-4 text-red-600" />
+                              <span className="text-xs">Google</span>
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

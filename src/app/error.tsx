@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import * as Sentry from '@sentry/nextjs';
 
 /**
  * App-level Error Boundary
@@ -22,11 +23,18 @@ export default function Error({
     // Log error to console in development
     console.error('App error boundary caught:', error);
 
-    // In production, send to error reporting service
-    if (process.env.NODE_ENV === 'production') {
-      // TODO: Send to error reporting service
-      // Example: Sentry.captureException(error);
-    }
+    // Send to Sentry error reporting service
+    Sentry.captureException(error, {
+      tags: {
+        errorBoundary: 'app-error',
+        component: 'error.tsx',
+      },
+      extra: {
+        digest: error.digest,
+        message: error.message,
+        stack: error.stack,
+      },
+    });
   }, [error]);
 
   return (

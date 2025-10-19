@@ -3,11 +3,17 @@
 import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Shield, AlertCircle } from "lucide-react";
+
+// World-class device fingerprinting (FingerprintJS)
+import { useDeviceFingerprintOnce } from "@/hooks/useDeviceFingerprint";
+import { useCaptcha, getRecaptchaSiteKey, isRecaptchaEnabled } from "@/hooks/useCaptcha";
 
 // Staff email domains and whitelist
 const ADMIN_DOMAINS = ['marketsage.africa'];
@@ -26,6 +32,16 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [showCaptcha, setShowCaptcha] = useState(false);
+
+  // Device fingerprinting (world-class security with FingerprintJS)
+  const { fingerprintId, loading: fingerprintLoading, isReliable } = useDeviceFingerprintOnce();
+
+  // CAPTCHA hook (world-class Google reCAPTCHA v2)
+  const { recaptchaRef, executeRecaptcha, resetRecaptcha } = useCaptcha();
+  const captchaSiteKey = getRecaptchaSiteKey();
+  const captchaEnabled = isRecaptchaEnabled();
 
   useEffect(() => {
     if (status === "loading") return;
@@ -57,7 +73,7 @@ export default function AdminLoginPage() {
     setError("");
 
     // Check if email is from staff domain
-    const isStaffEmail = ADMIN_EMAILS.includes(email) || 
+    const isStaffEmail = ADMIN_EMAILS.includes(email) ||
                         ADMIN_DOMAINS.some(domain => email.endsWith(`@${domain}`));
 
     if (!isStaffEmail) {
@@ -67,20 +83,62 @@ export default function AdminLoginPage() {
     }
 
     try {
+      // Get CAPTCHA token if required (after 3 failed attempts or if backend requires it)
+      let captchaToken: string | undefined;
+      if (captchaEnabled && showCaptcha && captchaSiteKey) {
+        const token = await executeRecaptcha();
+        if (!token) {
+          setError("Please complete the CAPTCHA verification");
+          setIsLoading(false);
+          return;
+        }
+        captchaToken = token;
+      }
+
+      // Include device fingerprint for security (staff authentication tracking)
       const result = await signIn("credentials", {
         email,
         password,
+        deviceFingerprint: fingerprintId || undefined,
+        captchaToken: captchaToken,
         redirect: false,
       });
 
       if (result?.error) {
+        // Increment failed attempts and show CAPTCHA after 3 failures
+        const newFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(newFailedAttempts);
+
+        if (captchaEnabled && newFailedAttempts >= 3) {
+          setShowCaptcha(true);
+        }
+
         setError("Invalid credentials. Please check your email and password.");
+
+        // Reset CAPTCHA after failed attempt
+        if (showCaptcha) {
+          resetRecaptcha();
+        }
       } else if (result?.ok) {
+        // Log fingerprint reliability for staff security monitoring
+        if (!isReliable && fingerprintId) {
+          console.warn('[Admin Login] Device fingerprint has low confidence');
+        }
+
+        // Reset failed attempts on success
+        setFailedAttempts(0);
+        setShowCaptcha(false);
+
         // Successful login, redirect will happen in useEffect
         router.push("/admin/dashboard");
       }
     } catch (error) {
       setError("An error occurred during login. Please try again.");
+
+      // Reset CAPTCHA on error
+      if (showCaptcha) {
+        resetRecaptcha();
+      }
     } finally {
       setIsLoading(false);
     }
@@ -179,6 +237,27 @@ export default function AdminLoginPage() {
                   required
                 />
               </div>
+
+              {/* CAPTCHA (shown after 3 failed login attempts) */}
+              {captchaEnabled && showCaptcha && captchaSiteKey && (
+                <div className="flex justify-center">
+                  <ReCAPTCHA
+                    ref={recaptchaRef}
+                    sitekey={captchaSiteKey}
+                    theme="light"
+                  />
+                </div>
+              )}
+
+              {/* Show message about CAPTCHA requirement */}
+              {showCaptcha && captchaEnabled && (
+                <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
+                  <Shield className="h-4 w-4 text-yellow-600" />
+                  <AlertDescription className="text-sm text-yellow-800 dark:text-yellow-300">
+                    For security, please complete the CAPTCHA verification before logging in.
+                  </AlertDescription>
+                </Alert>
+              )}
 
               <Button
                 type="submit"

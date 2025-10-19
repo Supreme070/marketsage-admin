@@ -161,12 +161,12 @@ export function createAdminHandler(
 }
 
 /**
- * Log admin action (stub - integrates with audit logging)
+ * Log admin action to backend audit logging API
  *
  * @param user - Admin user performing the action
- * @param action - Action name
- * @param resource - Resource being acted upon
- * @param metadata - Additional metadata
+ * @param action - Action name (e.g., 'CREATE', 'UPDATE', 'DELETE', 'LOGIN')
+ * @param resource - Resource being acted upon (e.g., 'user', 'campaign', 'organization')
+ * @param metadata - Additional metadata about the action
  */
 export async function logAdminAction(
   user: AdminUser,
@@ -175,24 +175,40 @@ export async function logAdminAction(
   metadata?: any
 ): Promise<void> {
   try {
-    // In a real implementation, this would call the audit logging API
-    // For now, just console log in development
+    // Console log in development for debugging
     if (process.env.NODE_ENV === 'development') {
       console.log(`[AUDIT] ${user.email} - ${action} on ${resource}`, metadata);
     }
 
-    // TODO: Call backend audit logging API
-    // await fetch(`${process.env.BACKEND_URL}/admin/audit/log`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({
-    //     userId: user.id,
-    //     action,
-    //     resource,
-    //     metadata,
-    //     timestamp: new Date().toISOString(),
-    //   }),
-    // });
+    // Call backend audit logging API
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3006';
+    const response = await fetch(`${backendUrl}/admin/audit/log`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        action,
+        resource,
+        userId: user.id,
+        userEmail: user.email,
+        metadata: {
+          ...metadata,
+          adminRole: user.role,
+          adminName: user.name,
+        },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('[admin-api-middleware] Audit logging failed:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
+    }
   } catch (error) {
     console.error('[admin-api-middleware] Failed to log admin action:', error);
     // Don't throw - logging failures shouldn't break the API
